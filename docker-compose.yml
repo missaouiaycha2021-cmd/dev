@@ -1,0 +1,16 @@
+services:
+  backend:
+    build: ./backend
+    container_name: backend-api
+    ports:
+      - "5000:5000"
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: frontend-app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
