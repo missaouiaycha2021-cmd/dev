@@ -1,13 +1,13 @@
 services:
   backend:
-    build: ./backend
+    image: aycha123/mon-dashboard-backend:latest
     container_name: backend-api
     ports:
       - "5000:5000"
     restart: always
 
   frontend:
-    build: ./frontend
+    image: aycha123/mon-dashboard-frontend:latest
     container_name: frontend-app
     ports:
       - "3000:3000"

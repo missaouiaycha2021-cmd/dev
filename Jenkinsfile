@@ -8,7 +8,6 @@ pipeline {
   }
 
   stages {
-
     // ================= CHECKOUT =================
     stage('Checkout') {
       steps {
@@ -24,14 +23,14 @@ pipeline {
           python3 --version || true
           node --version || true
           docker --version || true
+          docker compose version || true
         '''
       }
     }
 
-    // ================= INSTALL =================
+    // ================= INSTALL DEPENDENCIES =================
     stage('Install Dependencies') {
       parallel {
-
         stage('Backend') {
           steps {
             dir('backend') {
@@ -39,30 +38,23 @@ pipeline {
             }
           }
         }
-
         stage('Frontend') {
           steps {
             dir('frontend') {
               sh '''
-                # Charger NVM proprement
                 export NVM_DIR="$HOME/.nvm"
                 if [ -s "$NVM_DIR/nvm.sh" ]; then
                   . "$NVM_DIR/nvm.sh"
                 else
-                  echo "NVM not found ❌"
-                  exit 1
+                  echo "NVM not found ❌" && exit 1
                 fi
-
                 nvm install 20
                 nvm use 20
-
-                node --version
                 npm install
               '''
             }
           }
         }
-
       }
     }
 
@@ -73,7 +65,6 @@ pipeline {
           sh '''
             export NVM_DIR="$HOME/.nvm"
             . "$NVM_DIR/nvm.sh"
-
             nvm use 20
             npm run build
           '''
@@ -81,26 +72,23 @@ pipeline {
       }
     }
 
-    // ================= DOCKER BUILD =================
+    // ================= BUILD DOCKER IMAGES =================
     stage('Build Docker Images') {
       parallel {
-
         stage('Backend') {
           steps {
             sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG backend/'
           }
         }
-
         stage('Frontend') {
           steps {
             sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG frontend/'
           }
         }
-
       }
     }
 
-    // ================= LOGIN =================
+    // ================= DOCKER LOGIN =================
     stage('Docker Login') {
       steps {
         withCredentials([usernamePassword(
@@ -113,44 +101,57 @@ pipeline {
       }
     }
 
-    // ================= PUSH =================
-    stage('Push Images') {
-      parallel {
-
-        stage('Backend') {
-          steps {
-            sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG'
-          }
-        }
-
-        stage('Frontend') {
-          steps {
-            sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG'
-          }
-        }
-
+  // ================= PUSH IMAGES =================
+stage('Push Images') {
+  parallel {
+    stage('Backend') {
+      steps {
+        sh '''
+          docker push $BACKEND_IMAGE:$IMAGE_TAG
+          docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
+          docker push $BACKEND_IMAGE:latest
+        '''
       }
     }
+    stage('Frontend') {
+      steps {
+        sh '''
+          docker push $FRONTEND_IMAGE:$IMAGE_TAG
+          docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
+          docker push $FRONTEND_IMAGE:latest
+        '''
+      }
+    }
+  }
+}
 
     // ================= DEPLOY =================
     stage('Deploy') {
       steps {
         sh '''
+          echo "=== Pulling latest images ==="
+          docker compose pull
+
+          echo "=== Stopping old containers ==="
           docker compose down || true
+
+          echo "=== Starting new containers ==="
           docker compose up -d
+
+          echo "=== Cleaning unused images ==="
+          docker image prune -f
         '''
       }
     }
-
   }
 
-  // ================= POST =================
+  // ================= POST ACTIONS =================
   post {
     success {
-      echo 'CI/CD SUCCESS 🚀'
+      echo '✅ CI/CD Pipeline SUCCESS 🚀'
     }
     failure {
-      echo 'CI/CD FAILED ❌'
+      echo '❌ CI/CD Pipeline FAILED'
     }
     always {
       sh 'docker logout || true'
