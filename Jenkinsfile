@@ -122,10 +122,7 @@ pipeline {
             }
         }
 
-        // ==================== STAGE AUTO COMMIT & PUSH (CORRIGÉ) ====================
-                // ==================== STAGE AUTO COMMIT & PUSH (VERSION FIXÉE) ====================
-            // ==================== STAGE AUTO COMMIT & PUSH (VERSION ROBUSTE) ====================
-              // ==================== STAGE AUTO COMMIT & PUSH (VERSION FINALE - GÈRE detached HEAD) ====================
+        // ==================== STAGE AUTO COMMIT & PUSH (VERSION FINALE) ====================
         stage('Commit & Push to GitHub') {
             when {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
@@ -137,30 +134,28 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            echo "=== Correction du detached HEAD et détection des changements ==="
+                            echo "=== Correction detached HEAD + détection changements ==="
 
-                            # Force le passage sur la branche main (très important !)
+                            # Fix detached HEAD + mise à jour avec GitHub
                             git checkout main || git checkout master || true
-                            git pull origin main || true   # Met à jour avec la dernière version
+                            git fetch origin
+                            git pull --rebase origin main || true
 
-                            # Mise à jour du fichier VERSION
+                            # Mise à jour VERSION
                             echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
 
                             # Ajoute TOUT (nouveaux fichiers + modifications + suppressions)
                             git add -A .
 
-                            # Affiche l'état pour debug (tu verras clairement ce qui est détecté)
                             echo "=== git status après git add -A ==="
                             git status --short
 
-                            # Vérification
                             if git diff --cached --quiet; then
                                 echo "ℹ️ Aucun changement détecté après git add -A"
-                                echo "   → Vérifie que tes fichiers ne sont pas dans .gitignore"
                             else
                                 git commit -m "${GIT_COMMIT_MESSAGE}"
                                 git push origin HEAD:main
-                                echo "✅ SUCCÈS : Changements poussés automatiquement sur GitHub"
+                                echo "✅ SUCCÈS : Changements (HTML, ajouts, suppressions) poussés automatiquement par Jenkins"
                             fi
                         '''
                     }
@@ -171,10 +166,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD Pipeline SUCCESS → Version + fichiers HTML poussés sur GitHub 🚀'
+            echo '✅ CI/CD Pipeline SUCCESS → Changements poussés sur GitHub'
         }
         failure {
-            echo '❌ CI/CD Pipeline FAILED → Aucun push effectué'
+            echo '❌ CI/CD Pipeline FAILED'
         }
         always {
             sh 'docker logout || true'
