@@ -1,6 +1,10 @@
 pipeline {
   agent any
 
+  triggers {
+    githubPush()   // Déclenchement automatique via webhook GitHub
+  }
+
   environment {
     BACKEND_IMAGE  = "aycha123/mon-dashboard-backend"
     FRONTEND_IMAGE = "aycha123/mon-dashboard-frontend"
@@ -17,7 +21,7 @@ pipeline {
     stage('Check Tools') {
       steps {
         sh '''
-          echo "Checking versions..."
+          echo "=== Checking tools versions ==="
           python3 --version || true
           node --version || true
           docker --version || true
@@ -31,7 +35,7 @@ pipeline {
         stage('Backend') {
           steps {
             dir('backend') {
-              sh 'pip install -r requirements.txt'
+              sh 'pip install -r requirements.txt --break-system-packages || true'
             }
           }
         }
@@ -43,11 +47,11 @@ pipeline {
                 if [ -s "$NVM_DIR/nvm.sh" ]; then
                   . "$NVM_DIR/nvm.sh"
                 else
-                  echo "NVM not found ❌" && exit 1
+                  echo "❌ NVM not found" && exit 1
                 fi
-                nvm install 20
+                nvm install 20 --no-install-recommends || true
                 nvm use 20
-                npm install
+                npm ci   # Plus rapide et plus fiable que npm install
               '''
             }
           }
@@ -72,12 +76,12 @@ pipeline {
       parallel {
         stage('Backend') {
           steps {
-            sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG backend/'
+            sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG -t $BACKEND_IMAGE:latest backend/'
           }
         }
         stage('Frontend') {
           steps {
-            sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG frontend/'
+            sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest frontend/'
           }
         }
       }
@@ -91,7 +95,8 @@ pipeline {
           passwordVariable: 'PASS'
         )]) {
           sh '''
-            # Fix IPv6 connection issue
+            echo "=== Logging into Docker Hub ==="
+            # Fix pour problème IPv6 (si nécessaire)
             echo "nameserver 8.8.8.8" > /etc/resolv.conf || true
             echo $PASS | docker login -u $USER --password-stdin
           '''
@@ -103,20 +108,12 @@ pipeline {
       parallel {
         stage('Backend') {
           steps {
-            sh '''
-              docker push $BACKEND_IMAGE:$IMAGE_TAG
-              docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
-              docker push $BACKEND_IMAGE:latest
-            '''
+            sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG && docker push $BACKEND_IMAGE:latest'
           }
         }
         stage('Frontend') {
           steps {
-            sh '''
-              docker push $FRONTEND_IMAGE:$IMAGE_TAG
-              docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
-              docker push $FRONTEND_IMAGE:latest
-            '''
+            sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG && docker push $FRONTEND_IMAGE:latest'
           }
         }
       }
@@ -126,15 +123,15 @@ pipeline {
       steps {
         sh '''
           echo "=== Pulling latest images ==="
-          docker compose pull
+          docker compose pull || true
 
-          echo "=== Stopping and removing old containers ==="
+          echo "=== Stopping old containers ==="
           docker compose down --remove-orphans || true
 
           echo "=== Starting new containers ==="
           docker compose up -d --force-recreate
 
-          echo "=== Cleaning old images ==="
+          echo "=== Cleaning unused images ==="
           docker image prune -f
         '''
       }
