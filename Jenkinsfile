@@ -6,10 +6,10 @@ pipeline {
     }
 
     environment {
-        BACKEND_IMAGE = "aycha123/mon-dashboard-backend"
-        FRONTEND_IMAGE = "aycha123/mon-dashboard-frontend"
-        IMAGE_TAG = "v${BUILD_NUMBER}"
-        SONAR_PROJECT_KEY = "mon-dashboard"          // Change selon ton projet
+        BACKEND_IMAGE     = "aycha123/mon-dashboard-backend"
+        FRONTEND_IMAGE    = "aycha123/mon-dashboard-frontend"
+        IMAGE_TAG         = "v${BUILD_NUMBER}"
+        SONAR_PROJECT_KEY = "mon-dashboard"
         SONAR_PROJECT_NAME = "Mon Dashboard"
     }
 
@@ -68,28 +68,14 @@ pipeline {
             }
         }
 
-        // ==================== NOUVEAU STAGE : SONARQUBE ANALYSIS ====================
-             stage('Build Frontend') {
-            steps {
-                dir('frontend') {
-                    sh '''
-                        export NVM_DIR="$HOME/.nvm"
-                        . "$NVM_DIR/nvm.sh"
-                        nvm use 20
-                        npm run build
-                    '''
-                }
-            }
-        }
-
-        // ====================== SONARQUBE ======================
+        // ====================== SONARQUBE ANALYSIS ======================
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv('SonarQube') {   // Nom configuré dans Jenkins
                     sh '''
                         sonar-scanner \
-                            -Dsonar.projectKey=mon-dashboard \
-                            -Dsonar.projectName="Mon Dashboard" \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
                             -Dsonar.sources=. \
                             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**
                     '''
@@ -97,12 +83,14 @@ pipeline {
             }
         }
 
+        // ====================== QUALITY GATE ======================
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     script {
                         def qg = waitForQualityGate()
                         echo "🔍 SonarQube Quality Gate Status : ${qg.status}"
+                        
                         if (qg.status != 'OK') {
                             error "❌ Quality Gate FAILED : ${qg.status}"
                         } else {
@@ -112,11 +100,8 @@ pipeline {
                 }
             }
         }
-        // =======================================================
 
-        stage('Build Docker Images') {
-            // ... ton stage Docker reste le même
-
+        // ====================== BUILD & DEPLOY ======================
         stage('Build Docker Images') {
             parallel {
                 stage('Backend') {
