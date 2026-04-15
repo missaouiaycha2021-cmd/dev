@@ -2,21 +2,36 @@ pipeline {
   agent any
 
   environment {
-    BACKEND_IMAGE  = "missaouiaycha/mon-dashboard-backend"
-    FRONTEND_IMAGE = "missaouiaycha/mon-dashboard-frontend"
+    BACKEND_IMAGE  = "aycha123/mon-dashboard-backend"
+    FRONTEND_IMAGE = "aycha123/mon-dashboard-frontend"
     IMAGE_TAG      = "v${BUILD_NUMBER}"
   }
 
   stages {
 
+    // ================= CHECKOUT =================
     stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
+    // ================= VERIFY TOOLS =================
+    stage('Check Tools') {
+      steps {
+        sh '''
+          echo "Checking versions..."
+          python3 --version || true
+          node --version || true
+          docker --version || true
+        '''
+      }
+    }
+
+    // ================= INSTALL =================
     stage('Install Dependencies') {
       parallel {
+
         stage('Backend') {
           steps {
             dir('backend') {
@@ -24,28 +39,41 @@ pipeline {
             }
           }
         }
+
         stage('Frontend') {
           steps {
             dir('frontend') {
               sh '''
+                # Charger NVM proprement
                 export NVM_DIR="$HOME/.nvm"
-                [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+                if [ -s "$NVM_DIR/nvm.sh" ]; then
+                  . "$NVM_DIR/nvm.sh"
+                else
+                  echo "NVM not found ❌"
+                  exit 1
+                fi
+
+                nvm install 20
                 nvm use 20
+
                 node --version
                 npm install
               '''
             }
           }
         }
+
       }
     }
 
+    // ================= BUILD FRONTEND =================
     stage('Build Frontend') {
       steps {
         dir('frontend') {
           sh '''
             export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            . "$NVM_DIR/nvm.sh"
+
             nvm use 20
             npm run build
           '''
@@ -53,21 +81,26 @@ pipeline {
       }
     }
 
+    // ================= DOCKER BUILD =================
     stage('Build Docker Images') {
       parallel {
+
         stage('Backend') {
           steps {
             sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG backend/'
           }
         }
+
         stage('Frontend') {
           steps {
             sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG frontend/'
           }
         }
+
       }
     }
 
+    // ================= LOGIN =================
     stage('Docker Login') {
       steps {
         withCredentials([usernamePassword(
@@ -80,34 +113,38 @@ pipeline {
       }
     }
 
+    // ================= PUSH =================
     stage('Push Images') {
       parallel {
+
         stage('Backend') {
           steps {
-            sh '''
-              docker push $BACKEND_IMAGE:$IMAGE_TAG
-            '''
+            sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG'
           }
         }
+
         stage('Frontend') {
           steps {
-            sh '''
-              docker push $FRONTEND_IMAGE:$IMAGE_TAG
-            '''
+            sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG'
           }
         }
+
       }
     }
 
+    // ================= DEPLOY =================
     stage('Deploy') {
       steps {
-        sh 'docker compose down || true'
-        sh 'docker compose up -d --build'
+        sh '''
+          docker compose down || true
+          docker compose up -d
+        '''
       }
     }
 
   }
-//
+
+  // ================= POST =================
   post {
     success {
       echo 'CI/CD SUCCESS 🚀'
