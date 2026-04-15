@@ -125,6 +125,7 @@ pipeline {
         // ==================== STAGE AUTO COMMIT & PUSH (CORRIGÉ) ====================
                 // ==================== STAGE AUTO COMMIT & PUSH (VERSION FIXÉE) ====================
             // ==================== STAGE AUTO COMMIT & PUSH (VERSION ROBUSTE) ====================
+              // ==================== STAGE AUTO COMMIT & PUSH (VERSION FINALE - GÈRE detached HEAD) ====================
         stage('Commit & Push to GitHub') {
             when {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
@@ -136,25 +137,30 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            echo "=== Détection complète des changements (ajouts + mods + suppressions) ==="
+                            echo "=== Correction du detached HEAD et détection des changements ==="
 
-                            # Force Git à se mettre sur la bonne branche
+                            # Force le passage sur la branche main (très important !)
                             git checkout main || git checkout master || true
+                            git pull origin main || true   # Met à jour avec la dernière version
 
-                            # Mise à jour du fichier VERSION (garantit au moins un changement)
+                            # Mise à jour du fichier VERSION
                             echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
 
-                            # Ajoute TOUT : nouveaux fichiers, modifications ET suppressions
+                            # Ajoute TOUT (nouveaux fichiers + modifications + suppressions)
                             git add -A .
 
-                            # Vérification claire
+                            # Affiche l'état pour debug (tu verras clairement ce qui est détecté)
+                            echo "=== git status après git add -A ==="
+                            git status --short
+
+                            # Vérification
                             if git diff --cached --quiet; then
-                                echo "ℹ️ VRAIMENT aucun changement détecté après git add -A"
-                                echo "   → Vérifie que tes fichiers ne sont pas ignorés par .gitignore"
+                                echo "ℹ️ Aucun changement détecté après git add -A"
+                                echo "   → Vérifie que tes fichiers ne sont pas dans .gitignore"
                             else
                                 git commit -m "${GIT_COMMIT_MESSAGE}"
                                 git push origin HEAD:main
-                                echo "✅ SUCCÈS : Changements (nouveaux + modifiés + supprimés) poussés automatiquement"
+                                echo "✅ SUCCÈS : Changements poussés automatiquement sur GitHub"
                             fi
                         '''
                     }
