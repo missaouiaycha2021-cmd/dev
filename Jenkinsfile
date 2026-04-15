@@ -127,23 +127,22 @@ stage('Push Images') {
 
     // ================= DEPLOY =================
     stage('Deploy') {
-      steps {
-        sh '''
-          echo "=== Pulling latest images ==="
-          docker compose pull
+  steps {
+    sh '''
+      echo "=== Pulling latest images ==="
+      docker compose pull
 
-          echo "=== Stopping old containers ==="
-          docker compose down || true
+      echo "=== Stopping and removing old containers ==="
+      docker compose down --remove-orphans || true
 
-          echo "=== Starting new containers ==="
-          docker compose up -d
+      echo "=== Starting new containers ==="
+      docker compose up -d --force-recreate
 
-          echo "=== Cleaning unused images ==="
-          docker image prune -f
-        '''
-      }
-    }
+      echo "=== Cleaning old unused images ==="
+      docker image prune -f
+    '''
   }
+}
 
   // ================= POST ACTIONS =================
   post {
