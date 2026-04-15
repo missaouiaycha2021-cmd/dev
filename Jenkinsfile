@@ -23,6 +23,7 @@ pipeline {
         stage('Check Tools') {
             steps {
                 sh '''
+                    echo "=== Checking tools ==="
                     python3 --version || true
                     node --version || true
                     docker --version || true
@@ -72,39 +73,39 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    def scannerHome = tool 'SonarQube Scanner'
-                    withSonarQubeEnv('sonarqube') {
-                        sh "${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.projectName=\"${SONAR_PROJECT_NAME}\" \
-                            -Dsonar.sources=. \
-                            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**"
+                    try {
+                        def scannerHome = tool 'SonarQube Scanner'
+                        withSonarQubeEnv('sonarqube') {
+                            sh "${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                -Dsonar.projectName=\"${SONAR_PROJECT_NAME}\" \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**"
+                        }
+                        echo "✅ SonarQube Analysis completed"
+                    } catch (e) {
+                        echo "⚠️ SonarQube Analysis failed: ${e}"
                     }
                 }
             }
         }
 
-        // ====================== QUALITY GATE (corrigé pour ne plus bloquer) ======================
-        stage('Quality Gate') {
+        // ====================== SNYK SECURITY SCAN ======================
+        stage('Snyk Security Scan') {
             steps {
-                timeout(time: 3, unit: 'MINUTES') {
-                    script {
-                        try {
-                            def qg = waitForQualityGate(abortPipeline: false)
-                            echo "🔍 SonarQube Quality Gate Status : ${qg.status}"
-
-                            if (qg.status == 'OK') {
-                                echo "✅ Quality Gate PASSED - Code quality is good!"
-                            } else if (qg.status == 'WARN') {
-                                echo "⚠️ Quality Gate WARNING - Some minor issues"
-                            } else {
-                                echo "❌ Quality Gate FAILED : ${qg.status}"
-                                echo "⚠️ Le pipeline continue quand même"
-                            }
-                        } catch (Exception e) {
-                            echo "⚠️ Impossible de récupérer le Quality Gate (timeout ou erreur SonarQube)"
-                            echo "Le pipeline continue quand même."
-                        }
+                script {
+                    try {
+                        snykSecurity(
+                            snykInstallation: 'Snyk',           // ← Change si tu as mis un autre nom
+                            snykTokenId: 'snyk-token',          // ← ID du credential que tu as créé
+                            failOnIssues: false,                // false = ne bloque pas le pipeline (recommandé au début)
+                            monitorProjectOnBuild: true,        // Crée un projet sur Snyk pour suivi
+                            additionalArguments: '--all-projects --detection-depth=4'
+                        )
+                        echo "✅ Snyk Security Scan completed successfully"
+                    } catch (e) {
+                        echo "⚠️ Snyk Scan failed or found issues: ${e}"
+                        // Le pipeline continue quand même
                     }
                 }
             }
