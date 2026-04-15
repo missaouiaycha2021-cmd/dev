@@ -123,6 +123,7 @@ pipeline {
         }
 
         // ==================== STAGE AUTO COMMIT & PUSH (CORRIGÉ) ====================
+                // ==================== STAGE AUTO COMMIT & PUSH (VERSION FIXÉE) ====================
         stage('Commit & Push to GitHub') {
             when {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
@@ -134,27 +135,31 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            echo "=== Recherche des nouveaux fichiers HTML et modifications ==="
+                            echo "=== Recherche des modifications (HTML + fichiers générés) ==="
 
-                            # Mise à jour du fichier VERSION (garantit au moins un changement)
+                            # 1. Mise à jour du fichier VERSION (garantit qu'il y a toujours au moins 1 changement)
                             echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
 
-                            # Ajoute les fichiers de base
+                            # 2. Ajoute les fichiers de base
                             git add VERSION docker-compose.yml README.md || true
 
-                            # Ajoute tous les fichiers .html (récursif)
-                            find . -name "*.html" -type f | xargs git add || true
+                            # 3. Ajoute explicitement tous les fichiers .html (récursif)
+                            git add $(find . -name "*.html" -type f) || true
 
-                            # Ajoute le dossier de build du frontend (très important pour apple-fr.html)
+                            # 4. Ajoute le dossier de build du frontend (le plus important pour apple-fr.html)
                             git add frontend/dist/ frontend/build/ || true
 
-                            # Vérification : y a-t-il des changements ?
+                            # 5. Force l'ajout même si dans .gitignore (à utiliser avec prudence)
+                            # git add --force frontend/dist/ || true
+
+                            # Vérification finale
                             if git diff --cached --quiet; then
-                                echo "ℹ️ Aucun nouveau fichier ou modification détectée"
+                                echo "ℹ️ Aucun changement détecté par Jenkins"
+                                echo "   → Vérifie que le fichier apple-fr.html n'est pas dans .gitignore"
                             else
                                 git commit -m "${GIT_COMMIT_MESSAGE}"
                                 git push
-                                echo "✅ Nouveaux fichiers (HTML inclus) poussés automatiquement vers GitHub"
+                                echo "✅ Succès : Nouveaux fichiers (HTML inclus) poussés automatiquement vers GitHub"
                             fi
                         '''
                     }
