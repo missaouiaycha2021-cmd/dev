@@ -127,7 +127,7 @@ pipeline {
         }
 
         // ==================== NOUVEAU STAGE : Push automatique après succès ====================
-        stage('Commit & Push to GitHub') {
+              stage('Commit & Push to GitHub') {
             when {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
             }
@@ -138,24 +138,25 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            # Ajoute les fichiers que tu veux versionner (ex: version, changelog, docker-compose.yml mis à jour, etc.)
-                            git add docker-compose.yml README.md || true
+                            echo "=== Checking for changes to commit ==="
 
-                            # Commit seulement s'il y a des modifications
-                            if ! git diff --cached --quiet; then
-                                git commit -m "${GIT_COMMIT_MESSAGE}"
-                                git push
-                                echo "✅ Changements poussés automatiquement vers GitHub"
+                            # Liste les fichiers que tu veux éventuellement pousser
+                            git add docker-compose.yml README.md .env.example || true
+
+                            # Vérification propre : y a-t-il vraiment des modifications ?
+                            if git diff --cached --quiet; then
+                                echo "ℹ️ Aucun changement détecté → rien à commiter ni pousser"
                             else
-                                echo "ℹ️ Aucun changement à pousser"
+                                git commit -m "chore: automatic update after successful Jenkins build [skip ci]"
+                                git push --porcelain
+                                echo "✅ Changements poussés automatiquement vers GitHub"
                             fi
                         '''
                     }
                 }
             }
         }
-    }
-
+    
     post {
         success {
             echo '✅ CI/CD Pipeline SUCCESS → Changements poussés sur GitHub 🚀'
