@@ -83,17 +83,21 @@ pipeline {
       }
     }
 
-   stage('Docker Login') {
-  steps {
-    withCredentials([usernamePassword(
-      credentialsId: 'dockerhub',
-      usernameVariable: 'USER',
-      passwordVariable: 'PASS'
-    )]) {
-      sh 'echo $PASS | docker login -u $USER --password-stdin --ipv4'
+    stage('Docker Login') {
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'dockerhub',
+          usernameVariable: 'USER',
+          passwordVariable: 'PASS'
+        )]) {
+          sh '''
+            # Fix IPv6 connection issue
+            echo "nameserver 8.8.8.8" > /etc/resolv.conf || true
+            echo $PASS | docker login -u $USER --password-stdin
+          '''
+        }
+      }
     }
-  }
-}
 
     stage('Push Images') {
       parallel {
@@ -118,23 +122,23 @@ pipeline {
       }
     }
 
- stage('Deploy') {
-  steps {
-    sh '''
-      echo "=== Pulling latest images ==="
-      docker compose pull
+    stage('Deploy') {
+      steps {
+        sh '''
+          echo "=== Pulling latest images ==="
+          docker compose pull
 
-      echo "=== Stopping and removing old containers ==="
-      docker compose down --remove-orphans || true
+          echo "=== Stopping and removing old containers ==="
+          docker compose down --remove-orphans || true
 
-      echo "=== Starting new containers ==="
-      docker compose up -d --force-recreate
+          echo "=== Starting new containers ==="
+          docker compose up -d --force-recreate
 
-      echo "=== Cleaning old unused images ==="
-      docker image prune -f
-    '''
-  }
-}
+          echo "=== Cleaning old images ==="
+          docker image prune -f
+        '''
+      }
+    }
   }
 
   post {
