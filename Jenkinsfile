@@ -69,16 +69,18 @@ pipeline {
         }
 
         // ====================== SONARQUBE ANALYSIS ======================
+              // ====================== SONARQUBE ANALYSIS ======================
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {   // Nom configuré dans Jenkins
-                    sh '''
-                        sonar-scanner \
+                script {
+                    def scannerHome = tool 'SonarQube Scanner'   // Nom exact que tu as mis ci-dessus
+                    withSonarQubeEnv('sonarqube') {
+                        sh "${scannerHome}/bin/sonar-scanner \
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
+                            -Dsonar.projectName=\"${SONAR_PROJECT_NAME}\" \
                             -Dsonar.sources=. \
-                            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**
-                    '''
+                            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**"
+                    }
                 }
             }
         }
