@@ -2,15 +2,13 @@ pipeline {
     agent any
 
     triggers {
-        githubPush()   // Déclenchement automatique sur push GitHub
+        githubPush()
     }
 
     environment {
-        BACKEND_IMAGE  = "aycha123/mon-dashboard-backend"
-        FRONTEND_IMAGE = "aycha123/mon-dashboard-frontend"
-        IMAGE_TAG      = "v${BUILD_NUMBER}"
-        
-        // Pour éviter la boucle infinie
+        BACKEND_IMAGE   = "aycha123/mon-dashboard-backend"
+        FRONTEND_IMAGE  = "aycha123/mon-dashboard-frontend"
+        IMAGE_TAG       = "v${BUILD_NUMBER}"
         GIT_COMMIT_MESSAGE = "chore: automatic update after successful build [skip ci]"
     }
 
@@ -89,9 +87,7 @@ pipeline {
         stage('Docker Login') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh '''
-                        echo $PASS | docker login -u $USER --password-stdin
-                    '''
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
                 }
             }
         }
@@ -126,8 +122,8 @@ pipeline {
             }
         }
 
-        // ==================== NOUVEAU STAGE : Push automatique après succès ====================
-              stage('Commit & Push to GitHub') {
+        // ==================== STAGE AUTO COMMIT & PUSH ====================
+        stage('Commit & Push to GitHub') {
             when {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
             }
@@ -138,28 +134,31 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            echo "=== Checking for changes to commit ==="
+                            echo "=== Mise à jour automatique de la version ==="
 
-                            # Liste les fichiers que tu veux éventuellement pousser
-                            git add docker-compose.yml README.md .env.example || true
+                            # Crée ou met à jour un fichier VERSION avec le numéro du build
+                            echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
 
-                            # Vérification propre : y a-t-il vraiment des modifications ?
+                            # Ajoute aussi d'autres fichiers si tu veux
+                            git add VERSION docker-compose.yml README.md || true
+
                             if git diff --cached --quiet; then
-                                echo "ℹ️ Aucun changement détecté → rien à commiter ni pousser"
+                                echo "ℹ️ Aucun changement détecté après mise à jour de VERSION"
                             else
-                                git commit -m "chore: automatic update after successful Jenkins build [skip ci]"
-                                git push --porcelain
-                                echo "✅ Changements poussés automatiquement vers GitHub"
+                                git commit -m "${GIT_COMMIT_MESSAGE}"
+                                git push
+                                echo "✅ Version v${BUILD_NUMBER} poussée automatiquement vers GitHub"
                             fi
                         '''
                     }
                 }
             }
         }
-    
+    }
+
     post {
         success {
-            echo '✅ CI/CD Pipeline SUCCESS → Changements poussés sur GitHub 🚀'
+            echo '✅ CI/CD Pipeline SUCCESS → Version poussée sur GitHub 🚀'
         }
         failure {
             echo '❌ CI/CD Pipeline FAILED → Aucun push effectué'
