@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     triggers {
-        // Vérifie GitHub toutes les 5 minutes
-        pollSCM('H/5 * * * *')
+        githubPush()
     }
 
     environment {
@@ -19,24 +18,18 @@ pipeline {
             }
         }
 
-        stage('Detect Changes') {
+        stage('Check Tools') {
             steps {
-                script {
-                    // Détecte si le dernier commit vient de Jenkins
-                    def lastCommitAuthor = sh(
-                        script: 'git log -1 --format="%an"',
-                        returnStdout: true
-                    ).trim()
-
-                    if (lastCommitAuthor == "Jenkins CI") {
-                        currentBuild.result = 'ABORTED'
-                        error("⛔ Commit fait par Jenkins → on arrête pour éviter la boucle")
-                    }
-                }
+                sh '''
+                    python3 --version || true
+                    node --version || true
+                    docker --version || true
+                    docker compose version || true
+                '''
             }
         }
 
-        stage('Install & Build') {
+        stage('Install Dependencies') {
             parallel {
                 stage('Backend') {
                     steps {
@@ -53,7 +46,6 @@ pipeline {
                                 . "$NVM_DIR/nvm.sh"
                                 nvm use 20
                                 npm ci
-                                npm run build
                             '''
                         }
                     }
@@ -61,20 +53,53 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker') {
+        stage('Build Frontend') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                        export NVM_DIR="$HOME/.nvm"
+                        . "$NVM_DIR/nvm.sh"
+                        nvm use 20
+                        npm run build
+                    '''
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            parallel {
+                stage('Backend') {
+                    steps {
+                        sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG -t $BACKEND_IMAGE:latest backend/'
+                    }
+                }
+                stage('Frontend') {
+                    steps {
+                        sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest frontend/'
+                    }
+                }
+            }
+        }
+
+        stage('Docker Login') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh '''
-                        docker build -t $BACKEND_IMAGE:$IMAGE_TAG -t $BACKEND_IMAGE:latest backend/
-                        docker build -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest frontend/
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+                }
+            }
+        }
 
-                        echo $PASS | docker login -u $USER --password-stdin
-
-                        docker push $BACKEND_IMAGE:$IMAGE_TAG
-                        docker push $BACKEND_IMAGE:latest
-                        docker push $FRONTEND_IMAGE:$IMAGE_TAG
-                        docker push $FRONTEND_IMAGE:latest
-                    '''
+        stage('Push Images') {
+            parallel {
+                stage('Backend') {
+                    steps {
+                        sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG && docker push $BACKEND_IMAGE:latest'
+                    }
+                }
+                stage('Frontend') {
+                    steps {
+                        sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG && docker push $FRONTEND_IMAGE:latest'
+                    }
                 }
             }
         }
@@ -89,45 +114,11 @@ pipeline {
                 '''
             }
         }
-
-        // ✅ Jenkins fait git add, commit, push automatiquement
-        stage('Auto Git Commit & Push') {
-            steps {
-                script {
-                    withCredentials([gitUsernamePassword(credentialsId: 'github-credentials', gitToolName: 'Default')]) {
-                        sh '''
-                            git config user.name "Jenkins CI"
-                            git config user.email "jenkins@aycha123.com"
-
-                            git checkout main || git checkout master
-                            git fetch origin
-                            git pull --rebase origin main
-
-                            # Mise à jour fichier VERSION
-                            echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
-
-                            # ✅ git add TOUT
-                            git add -A .
-
-                            git status --short
-
-                            if git diff --cached --quiet; then
-                                echo "ℹ️ Rien à commiter"
-                            else
-                                git commit -m "chore: auto-deploy build #${BUILD_NUMBER} [skip ci]"
-                                git push origin main
-                                echo "✅ Push automatique réussi !"
-                            fi
-                        '''
-                    }
-                }
-            }
-        }
     }
 
     post {
         success {
-            echo '✅ Pipeline réussi'
+            echo '✅ Pipeline réussi → Application déployée'
         }
         failure {
             echo '❌ Pipeline échoué'
