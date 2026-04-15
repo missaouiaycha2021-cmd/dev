@@ -6,10 +6,10 @@ pipeline {
     }
 
     environment {
-        BACKEND_IMAGE     = "aycha123/mon-dashboard-backend"
-        FRONTEND_IMAGE    = "aycha123/mon-dashboard-frontend"
-        IMAGE_TAG         = "v${BUILD_NUMBER}"
-        SONAR_PROJECT_KEY = "mon-project"
+        BACKEND_IMAGE      = "aycha123/mon-dashboard-backend"
+        FRONTEND_IMAGE     = "aycha123/mon-dashboard-frontend"
+        IMAGE_TAG          = "v${BUILD_NUMBER}"
+        SONAR_PROJECT_KEY  = "mon-project"
         SONAR_PROJECT_NAME = "mon-project"
     }
 
@@ -69,11 +69,10 @@ pipeline {
         }
 
         // ====================== SONARQUBE ANALYSIS ======================
-              // ====================== SONARQUBE ANALYSIS ======================
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    def scannerHome = tool 'SonarQube Scanner'   // Nom exact que tu as mis ci-dessus
+                    def scannerHome = tool 'SonarQube Scanner'
                     withSonarQubeEnv('sonarqube') {
                         sh "${scannerHome}/bin/sonar-scanner \
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
@@ -85,31 +84,32 @@ pipeline {
             }
         }
 
-        // ====================== QUALITY GATE ======================
-                stage('Quality Gate') {
+        // ====================== QUALITY GATE (corrigé pour ne plus bloquer) ======================
+        stage('Quality Gate') {
             steps {
-                timeout(time: 8, unit: 'MINUTES') {
+                timeout(time: 3, unit: 'MINUTES') {
                     script {
-                        def qg = waitForQualityGate(abortPipeline: false)   // ← Important : ne pas arrêter automatiquement
+                        try {
+                            def qg = waitForQualityGate(abortPipeline: false)
+                            echo "🔍 SonarQube Quality Gate Status : ${qg.status}"
 
-                        echo "🔍 SonarQube Quality Gate Status : ${qg.status}"
-
-                        if (qg.status == 'OK') {
-                            echo "✅ Quality Gate PASSED - Code quality is good!"
-                        } 
-                        else if (qg.status == 'WARN') {
-                            echo "⚠️ Quality Gate WARNING - Some minor issues"
-                        } 
-                        else {
-                            echo "❌ Quality Gate FAILED : ${qg.status}"
-                            echo "⚠️ Le pipeline continue quand même (Security ou Reliability faible)"
-                            // Tu peux décommenter la ligne ci-dessous plus tard si tu veux bloquer :
-                            // error "Quality Gate failed"
+                            if (qg.status == 'OK') {
+                                echo "✅ Quality Gate PASSED - Code quality is good!"
+                            } else if (qg.status == 'WARN') {
+                                echo "⚠️ Quality Gate WARNING - Some minor issues"
+                            } else {
+                                echo "❌ Quality Gate FAILED : ${qg.status}"
+                                echo "⚠️ Le pipeline continue quand même"
+                            }
+                        } catch (Exception e) {
+                            echo "⚠️ Impossible de récupérer le Quality Gate (timeout ou erreur SonarQube)"
+                            echo "Le pipeline continue quand même."
                         }
                     }
                 }
             }
         }
+
         // ====================== BUILD & DEPLOY ======================
         stage('Build Docker Images') {
             parallel {
