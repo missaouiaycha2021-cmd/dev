@@ -122,7 +122,7 @@ pipeline {
             }
         }
 
-        // ==================== STAGE AUTO COMMIT & PUSH ====================
+        // ==================== STAGE AUTO COMMIT & PUSH (CORRIGÉ) ====================
         stage('Commit & Push to GitHub') {
             when {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
@@ -134,20 +134,27 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            echo "=== Mise à jour automatique de la version ==="
+                            echo "=== Recherche des nouveaux fichiers HTML et modifications ==="
 
-                            # Crée ou met à jour un fichier VERSION avec le numéro du build
+                            # Mise à jour du fichier VERSION (garantit au moins un changement)
                             echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
 
-                            # Ajoute aussi d'autres fichiers si tu veux
+                            # Ajoute les fichiers de base
                             git add VERSION docker-compose.yml README.md || true
 
+                            # Ajoute tous les fichiers .html (récursif)
+                            find . -name "*.html" -type f | xargs git add || true
+
+                            # Ajoute le dossier de build du frontend (très important pour apple-fr.html)
+                            git add frontend/dist/ frontend/build/ || true
+
+                            # Vérification : y a-t-il des changements ?
                             if git diff --cached --quiet; then
-                                echo "ℹ️ Aucun changement détecté après mise à jour de VERSION"
+                                echo "ℹ️ Aucun nouveau fichier ou modification détectée"
                             else
                                 git commit -m "${GIT_COMMIT_MESSAGE}"
                                 git push
-                                echo "✅ Version v${BUILD_NUMBER} poussée automatiquement vers GitHub"
+                                echo "✅ Nouveaux fichiers (HTML inclus) poussés automatiquement vers GitHub"
                             fi
                         '''
                     }
@@ -158,7 +165,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD Pipeline SUCCESS → Version poussée sur GitHub 🚀'
+            echo '✅ CI/CD Pipeline SUCCESS → Version + fichiers HTML poussés sur GitHub 🚀'
         }
         failure {
             echo '❌ CI/CD Pipeline FAILED → Aucun push effectué'
