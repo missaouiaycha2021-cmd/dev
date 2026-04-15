@@ -2,14 +2,14 @@ pipeline {
     agent any
 
     triggers {
-        githubPush()
+        // Vérifie GitHub toutes les 5 minutes
+        pollSCM('H/5 * * * *')
     }
 
     environment {
-        BACKEND_IMAGE   = "aycha123/mon-dashboard-backend"
-        FRONTEND_IMAGE  = "aycha123/mon-dashboard-frontend"
-        IMAGE_TAG       = "v${BUILD_NUMBER}"
-        GIT_COMMIT_MESSAGE = "chore: automatic update after successful build [skip ci]"
+        BACKEND_IMAGE  = "aycha123/mon-dashboard-backend"
+        FRONTEND_IMAGE = "aycha123/mon-dashboard-frontend"
+        IMAGE_TAG      = "v${BUILD_NUMBER}"
     }
 
     stages {
@@ -19,19 +19,24 @@ pipeline {
             }
         }
 
-        stage('Check Tools') {
+        stage('Detect Changes') {
             steps {
-                sh '''
-                    echo "=== Checking tools versions ==="
-                    python3 --version || true
-                    node --version || true
-                    docker --version || true
-                    docker compose version || true
-                '''
+                script {
+                    // Détecte si le dernier commit vient de Jenkins
+                    def lastCommitAuthor = sh(
+                        script: 'git log -1 --format="%an"',
+                        returnStdout: true
+                    ).trim()
+
+                    if (lastCommitAuthor == "Jenkins CI") {
+                        currentBuild.result = 'ABORTED'
+                        error("⛔ Commit fait par Jenkins → on arrête pour éviter la boucle")
+                    }
+                }
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install & Build') {
             parallel {
                 stage('Backend') {
                     steps {
@@ -45,10 +50,10 @@ pipeline {
                         dir('frontend') {
                             sh '''
                                 export NVM_DIR="$HOME/.nvm"
-                                [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-                                nvm install 20 --no-install-recommends || true
+                                . "$NVM_DIR/nvm.sh"
                                 nvm use 20
                                 npm ci
+                                npm run build
                             '''
                         }
                     }
@@ -56,53 +61,20 @@ pipeline {
             }
         }
 
-        stage('Build Frontend') {
-            steps {
-                dir('frontend') {
-                    sh '''
-                        export NVM_DIR="$HOME/.nvm"
-                        . "$NVM_DIR/nvm.sh"
-                        nvm use 20
-                        npm run build
-                    '''
-                }
-            }
-        }
-
-        stage('Build Docker Images') {
-            parallel {
-                stage('Backend') {
-                    steps {
-                        sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG -t $BACKEND_IMAGE:latest backend/'
-                    }
-                }
-                stage('Frontend') {
-                    steps {
-                        sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest frontend/'
-                    }
-                }
-            }
-        }
-
-        stage('Docker Login') {
+        stage('Build & Push Docker') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh 'echo $PASS | docker login -u $USER --password-stdin'
-                }
-            }
-        }
+                    sh '''
+                        docker build -t $BACKEND_IMAGE:$IMAGE_TAG -t $BACKEND_IMAGE:latest backend/
+                        docker build -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest frontend/
 
-        stage('Push Images') {
-            parallel {
-                stage('Backend') {
-                    steps {
-                        sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG && docker push $BACKEND_IMAGE:latest'
-                    }
-                }
-                stage('Frontend') {
-                    steps {
-                        sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG && docker push $FRONTEND_IMAGE:latest'
-                    }
+                        echo $PASS | docker login -u $USER --password-stdin
+
+                        docker push $BACKEND_IMAGE:$IMAGE_TAG
+                        docker push $BACKEND_IMAGE:latest
+                        docker push $FRONTEND_IMAGE:$IMAGE_TAG
+                        docker push $FRONTEND_IMAGE:latest
+                    '''
                 }
             }
         }
@@ -110,23 +82,16 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    echo "=== Pulling latest images ==="
                     docker compose pull || true
-                    echo "=== Stopping old containers ==="
                     docker compose down --remove-orphans || true
-                    echo "=== Starting new containers ==="
                     docker compose up -d --force-recreate
-                    echo "=== Cleaning unused images ==="
                     docker image prune -f
                 '''
             }
         }
 
-        // ==================== STAGE AUTO COMMIT & PUSH (VERSION FINALE) ====================
-        stage('Commit & Push to GitHub') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
+        // ✅ Jenkins fait git add, commit, push automatiquement
+        stage('Auto Git Commit & Push') {
             steps {
                 script {
                     withCredentials([gitUsernamePassword(credentialsId: 'github-credentials', gitToolName: 'Default')]) {
@@ -134,28 +99,24 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@aycha123.com"
 
-                            echo "=== Correction detached HEAD + détection changements ==="
-
-                            # Fix detached HEAD + mise à jour avec GitHub
-                            git checkout main || git checkout master || true
+                            git checkout main || git checkout master
                             git fetch origin
-                            git pull --rebase origin main || true
+                            git pull --rebase origin main
 
-                            # Mise à jour VERSION
+                            # Mise à jour fichier VERSION
                             echo "v${BUILD_NUMBER} - $(date '+%Y-%m-%d %H:%M:%S')" > VERSION
 
-                            # Ajoute TOUT (nouveaux fichiers + modifications + suppressions)
+                            # ✅ git add TOUT
                             git add -A .
 
-                            echo "=== git status après git add -A ==="
                             git status --short
 
                             if git diff --cached --quiet; then
-                                echo "ℹ️ Aucun changement détecté après git add -A"
+                                echo "ℹ️ Rien à commiter"
                             else
-                                git commit -m "${GIT_COMMIT_MESSAGE}"
-                                git push origin HEAD:main
-                                echo "✅ SUCCÈS : Changements (HTML, ajouts, suppressions) poussés automatiquement par Jenkins"
+                                git commit -m "chore: auto-deploy build #${BUILD_NUMBER} [skip ci]"
+                                git push origin main
+                                echo "✅ Push automatique réussi !"
                             fi
                         '''
                     }
@@ -166,10 +127,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD Pipeline SUCCESS → Changements poussés sur GitHub'
+            echo '✅ Pipeline réussi'
         }
         failure {
-            echo '❌ CI/CD Pipeline FAILED'
+            echo '❌ Pipeline échoué'
         }
         always {
             sh 'docker logout || true'
