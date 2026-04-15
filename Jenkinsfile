@@ -71,7 +71,7 @@ pipeline {
         // ====================== SONARQUBE ANALYSIS ======================
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {   // Nom configuré dans Jenkins
+                withSonarQubeEnv('sonarqube') {   // Nom configuré dans Jenkins
                     sh '''
                         sonar-scanner \
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
