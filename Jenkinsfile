@@ -9,8 +9,8 @@ pipeline {
         BACKEND_IMAGE     = "aycha123/mon-dashboard-backend"
         FRONTEND_IMAGE    = "aycha123/mon-dashboard-frontend"
         IMAGE_TAG         = "v${BUILD_NUMBER}"
-        SONAR_PROJECT_KEY = "mon-dashboard"
-        SONAR_PROJECT_NAME = "Mon Dashboard"
+        SONAR_PROJECT_KEY = "mon-project"
+        SONAR_PROJECT_NAME = "mon-project"
     }
 
     stages {
