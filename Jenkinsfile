@@ -8,14 +8,12 @@ pipeline {
   }
 
   stages {
-    // ================= CHECKOUT =================
     stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
-    // ================= VERIFY TOOLS =================
     stage('Check Tools') {
       steps {
         sh '''
@@ -28,7 +26,6 @@ pipeline {
       }
     }
 
-    // ================= INSTALL DEPENDENCIES =================
     stage('Install Dependencies') {
       parallel {
         stage('Backend') {
@@ -58,7 +55,6 @@ pipeline {
       }
     }
 
-    // ================= BUILD FRONTEND =================
     stage('Build Frontend') {
       steps {
         dir('frontend') {
@@ -72,7 +68,6 @@ pipeline {
       }
     }
 
-    // ================= BUILD DOCKER IMAGES =================
     stage('Build Docker Images') {
       parallel {
         stage('Backend') {
@@ -88,7 +83,6 @@ pipeline {
       }
     }
 
-    // ================= DOCKER LOGIN =================
     stage('Docker Login') {
       steps {
         withCredentials([usernamePassword(
@@ -101,50 +95,48 @@ pipeline {
       }
     }
 
-  // ================= PUSH IMAGES =================
-stage('Push Images') {
-  parallel {
-    stage('Backend') {
-      steps {
-        sh '''
-          docker push $BACKEND_IMAGE:$IMAGE_TAG
-          docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
-          docker push $BACKEND_IMAGE:latest
-        '''
+    stage('Push Images') {
+      parallel {
+        stage('Backend') {
+          steps {
+            sh '''
+              docker push $BACKEND_IMAGE:$IMAGE_TAG
+              docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
+              docker push $BACKEND_IMAGE:latest
+            '''
+          }
+        }
+        stage('Frontend') {
+          steps {
+            sh '''
+              docker push $FRONTEND_IMAGE:$IMAGE_TAG
+              docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
+              docker push $FRONTEND_IMAGE:latest
+            '''
+          }
+        }
       }
     }
-    stage('Frontend') {
-      steps {
-        sh '''
-          docker push $FRONTEND_IMAGE:$IMAGE_TAG
-          docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
-          docker push $FRONTEND_IMAGE:latest
-        '''
-      }
-    }
-  }
-}
 
-    // ================= DEPLOY =================
     stage('Deploy') {
-  steps {
-    sh '''
-      echo "=== Pulling latest images ==="
-      docker compose pull
+      steps {
+        sh '''
+          echo "=== Pulling latest images ==="
+          docker compose pull
 
-      echo "=== Stopping and removing old containers ==="
-      docker compose down --remove-orphans || true
+          echo "=== Stopping and removing old containers ==="
+          docker compose down --remove-orphans || true
 
-      echo "=== Starting new containers ==="
-      docker compose up -d --force-recreate
+          echo "=== Starting new containers ==="
+          docker compose up -d --force-recreate
 
-      echo "=== Cleaning old unused images ==="
-      docker image prune -f
-    '''
+          echo "=== Cleaning old unused images ==="
+          docker image prune -f
+        '''
+      }
+    }
   }
-}
 
-  // ================= POST ACTIONS =================
   post {
     success {
       echo '✅ CI/CD Pipeline SUCCESS 🚀'
