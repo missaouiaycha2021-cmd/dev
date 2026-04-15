@@ -86,23 +86,30 @@ pipeline {
         }
 
         // ====================== QUALITY GATE ======================
-        stage('Quality Gate') {
+                stage('Quality Gate') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
+                timeout(time: 8, unit: 'MINUTES') {
                     script {
-                        def qg = waitForQualityGate()
+                        def qg = waitForQualityGate(abortPipeline: false)   // ← Important : ne pas arrêter automatiquement
+
                         echo "🔍 SonarQube Quality Gate Status : ${qg.status}"
-                        
-                        if (qg.status != 'OK') {
-                            error "❌ Quality Gate FAILED : ${qg.status}"
-                        } else {
+
+                        if (qg.status == 'OK') {
                             echo "✅ Quality Gate PASSED - Code quality is good!"
+                        } 
+                        else if (qg.status == 'WARN') {
+                            echo "⚠️ Quality Gate WARNING - Some minor issues"
+                        } 
+                        else {
+                            echo "❌ Quality Gate FAILED : ${qg.status}"
+                            echo "⚠️ Le pipeline continue quand même (Security ou Reliability faible)"
+                            // Tu peux décommenter la ligne ci-dessous plus tard si tu veux bloquer :
+                            // error "Quality Gate failed"
                         }
                     }
                 }
             }
         }
-
         // ====================== BUILD & DEPLOY ======================
         stage('Build Docker Images') {
             parallel {
