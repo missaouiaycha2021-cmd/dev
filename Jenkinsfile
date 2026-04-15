@@ -27,7 +27,13 @@ pipeline {
         stage('Frontend') {
           steps {
             dir('frontend') {
-              sh 'npm install'
+              sh '''
+                export NVM_DIR="$HOME/.nvm"
+                [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+                nvm use 20
+                node --version
+                npm install
+              '''
             }
           }
         }
@@ -37,7 +43,12 @@ pipeline {
     stage('Build Frontend') {
       steps {
         dir('frontend') {
-          sh 'npm run build'
+          sh '''
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            nvm use 20
+            npm run build
+          '''
         }
       }
     }
@@ -46,12 +57,12 @@ pipeline {
       parallel {
         stage('Backend') {
           steps {
-            sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG backend'
+            sh 'docker build -t $BACKEND_IMAGE:$IMAGE_TAG backend/'
           }
         }
         stage('Frontend') {
           steps {
-            sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG frontend'
+            sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG frontend/'
           }
         }
       }
@@ -59,7 +70,11 @@ pipeline {
 
     stage('Docker Login') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+        withCredentials([usernamePassword(
+          credentialsId: 'dockerhub',
+          usernameVariable: 'USER',
+          passwordVariable: 'PASS'
+        )]) {
           sh 'echo $PASS | docker login -u $USER --password-stdin'
         }
       }
@@ -69,12 +84,16 @@ pipeline {
       parallel {
         stage('Backend') {
           steps {
-            sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG'
+            sh '''
+              docker push $BACKEND_IMAGE:$IMAGE_TAG
+            '''
           }
         }
         stage('Frontend') {
           steps {
-            sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG'
+            sh '''
+              docker push $FRONTEND_IMAGE:$IMAGE_TAG
+            '''
           }
         }
       }
@@ -86,8 +105,9 @@ pipeline {
         sh 'docker compose up -d --build'
       }
     }
-  }
 
+  }
+//
   post {
     success {
       echo 'CI/CD SUCCESS 🚀'
@@ -96,6 +116,7 @@ pipeline {
       echo 'CI/CD FAILED ❌'
     }
     always {
+      sh 'docker logout || true'
       cleanWs()
     }
   }
