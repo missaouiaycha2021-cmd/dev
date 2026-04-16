@@ -76,7 +76,6 @@ stages {
         }
     }
 
-    // ====================== SONARQUBE ======================
     stage('SonarQube Analysis') {
         steps {
             script {
@@ -97,7 +96,6 @@ stages {
         }
     }
 
-    // ====================== SNYK ======================
     stage('Snyk Security Scan') {
         steps {
             script {
@@ -117,7 +115,6 @@ stages {
         }
     }
 
-    // ====================== TRIVY FILESYSTEM ======================
     stage('Trivy Filesystem Scan') {
         steps {
             sh '''
@@ -141,7 +138,6 @@ stages {
         }
     }
 
-    // ====================== BUILD DOCKER ======================
     stage('Build Docker Images') {
         parallel {
             stage('Backend') {
@@ -157,7 +153,6 @@ stages {
         }
     }
 
-    // ====================== TRIVY IMAGE ======================
     stage('Trivy Image Scan') {
         parallel {
 
@@ -193,7 +188,6 @@ stages {
         }
     }
 
-    // ====================== DOCKER LOGIN ======================
     stage('Docker Login') {
         steps {
             withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
@@ -202,7 +196,6 @@ stages {
         }
     }
 
-    // ====================== PUSH ======================
     stage('Push Images') {
         parallel {
             stage('Backend') {
@@ -218,7 +211,6 @@ stages {
         }
     }
 
-    // ====================== DEPLOY ======================
     stage('Deploy') {
         steps {
             sh '''
