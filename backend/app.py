@@ -1,10 +1,6 @@
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 
 app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Backend OK"
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+app.config['SECRET_KEY'] = 'ton-secret-key'
+csrf = CSRFProtect(app)  # ← CSRF activé ✅
