@@ -1,18 +1,15 @@
 pipeline {
     agent any
-
     triggers {
         githubPush()
     }
-
     environment {
-        BACKEND_IMAGE      = "aycha123/mon-dashboard-backend"
-        FRONTEND_IMAGE     = "aycha123/mon-dashboard-frontend"
-        IMAGE_TAG          = "v${BUILD_NUMBER}"
-        SONAR_PROJECT_KEY  = "mon-project"
+        BACKEND_IMAGE  = "aycha123/mon-dashboard-backend"
+        FRONTEND_IMAGE = "aycha123/mon-dashboard-frontend"
+        IMAGE_TAG      = "v${BUILD_NUMBER}"
+        SONAR_PROJECT_KEY = "mon-project"
         SONAR_PROJECT_NAME = "mon-project"
     }
-
     stages {
         stage('Checkout') {
             steps {
@@ -28,6 +25,8 @@ pipeline {
                     node --version || true
                     docker --version || true
                     docker compose version || true
+                    echo "Trivy version:"
+                    /usr/bin/trivy --version || echo "Trivy non accessible"
                 '''
             }
         }
@@ -96,22 +95,42 @@ pipeline {
                 script {
                     try {
                         snykSecurity(
-                            snykInstallation: 'Snyk',           // ← Change si tu as mis un autre nom
-                            snykTokenId: 'snyk-token',          // ← ID du credential que tu as créé
-                            failOnIssues: false,                // false = ne bloque pas le pipeline (recommandé au début)
-                            monitorProjectOnBuild: true,        // Crée un projet sur Snyk pour suivi
+                            snykInstallation: 'Snyk',
+                            snykTokenId: 'snyk-token',
+                            failOnIssues: false,
+                            monitorProjectOnBuild: true,
                             additionalArguments: '--all-projects --detection-depth=4'
                         )
                         echo "✅ Snyk Security Scan completed successfully"
                     } catch (e) {
                         echo "⚠️ Snyk Scan failed or found issues: ${e}"
-                        // Le pipeline continue quand même
                     }
                 }
             }
         }
 
-        // ====================== BUILD & DEPLOY ======================
+        // ====================== TRIVY SCANS ======================
+
+        stage('Trivy Filesystem Scan (avant build)') {
+            steps {
+                echo "🔍 Scan Trivy du système de fichiers (code + dépendances)..."
+                sh '''
+                    mkdir -p trivy-templates
+                    if [ ! -f trivy-templates/html.tpl ]; then
+                        wget -q https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O trivy-templates/html.tpl
+                    fi
+
+                    /usr/bin/trivy fs --severity HIGH,CRITICAL \
+                                      --format template \
+                                      --template "@/trivy-templates/html.tpl" \
+                                      --output trivy-fs-report.html \
+                                      --ignore-unfixed \
+                                      .
+                '''
+                archiveArtifacts artifacts: 'trivy-fs-report.html', allowEmptyArchive: true
+            }
+        }
+
         stage('Build Docker Images') {
             parallel {
                 stage('Backend') {
@@ -122,6 +141,49 @@ pipeline {
                 stage('Frontend') {
                     steps {
                         sh 'docker build -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest frontend/'
+                    }
+                }
+            }
+        }
+
+        stage('Trivy Image Scan (après build)') {
+            parallel {
+                stage('Backend Image') {
+                    steps {
+                        echo "🔍 Scan Trivy de l'image Backend..."
+                        sh '''
+                            mkdir -p trivy-templates
+                            if [ ! -f trivy-templates/html.tpl ]; then
+                                wget -q https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O trivy-templates/html.tpl
+                            fi
+
+                            /usr/bin/trivy image --severity HIGH,CRITICAL \
+                                                 --format template \
+                                                 --template "@/trivy-templates/html.tpl" \
+                                                 --output trivy-backend-image.html \
+                                                 --ignore-unfixed \
+                                                 $BACKEND_IMAGE:$IMAGE_TAG
+                        '''
+                        archiveArtifacts artifacts: 'trivy-backend-image.html', allowEmptyArchive: true
+                    }
+                }
+                stage('Frontend Image') {
+                    steps {
+                        echo "🔍 Scan Trivy de l'image Frontend..."
+                        sh '''
+                            mkdir -p trivy-templates
+                            if [ ! -f trivy-templates/html.tpl ]; then
+                                wget -q https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O trivy-templates/html.tpl
+                            fi
+
+                            /usr/bin/trivy image --severity HIGH,CRITICAL \
+                                                 --format template \
+                                                 --template "@/trivy-templates/html.tpl" \
+                                                 --output trivy-frontend-image.html \
+                                                 --ignore-unfixed \
+                                                 $FRONTEND_IMAGE:$IMAGE_TAG
+                        '''
+                        archiveArtifacts artifacts: 'trivy-frontend-image.html', allowEmptyArchive: true
                     }
                 }
             }
@@ -170,6 +232,16 @@ pipeline {
             echo '❌ Pipeline échoué'
         }
         always {
+            // Publication des rapports Trivy dans Jenkins (très lisible)
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: '.',
+                reportFiles: 'trivy-fs-report.html,trivy-backend-image.html,trivy-frontend-image.html',
+                reportName: '📊 Trivy Vulnerability Reports'
+            ])
+
             sh 'docker logout || true'
             cleanWs()
         }
