@@ -3,8 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Overview from "./pages/Overview"; 
 import Servers from "./pages/Servers";
-import Alerts from "./pages/Alerts";           // Import de la page Alerts
-import Predictions from "./pages/Predictions"; // Import de la page Predictions
+import Alerts from "./pages/Alerts";         
+
 
 function App() {
   return (
@@ -20,7 +20,6 @@ function App() {
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/servers" element={<Servers />} />
-            <Route path="/predictions" element={<Predictions />} />
             <Route path="/alerts" element={<Alerts />} />
           </Routes>
         </div>

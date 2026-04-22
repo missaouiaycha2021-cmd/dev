@@ -1,74 +1,121 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { FaServer, FaExclamationTriangle, FaMicrochip, FaExclamationCircle } from "react-icons/fa";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  CartesianGrid, ResponsiveContainer
 } from "recharts";
 import "./Overview.css";
 
-const data = [
-  { time: "10:00", cpu: 40, ram: 60 },
-  { time: "10:05", cpu: 55, ram: 65 },
-  { time: "10:10", cpu: 70, ram: 75 },
-  { time: "10:15", cpu: 90, ram: 85 },
-  { time: "10:20", cpu: 80, ram: 78 },
-];
-
 const Overview = () => {
+  const [servers, setServers]   = useState([]);
+  const [alerts, setAlerts]     = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [loading, setLoading]   = useState(true);
+
+  const fetchData = async () => {
+    try {
+      // Charger serveurs et alertes en même temps
+      const [resServers, resAlerts] = await Promise.all([
+        fetch("http://localhost:5000/api/servers"),
+        fetch("http://localhost:5000/api/alerts")
+      ]);
+
+      const dataServers = await resServers.json();
+      const dataAlerts  = await resAlerts.json();
+
+      setServers(dataServers);
+      setAlerts(dataAlerts);
+
+      // Construire les données du graphique depuis les serveurs
+      const chart = dataServers.map((srv, i) => ({
+        time    : `Srv-${i + 1}`,
+        cpu     : srv.cpu_usage,
+        ram     : srv.ram_usage,
+        disk    : srv.disk_usage,
+        network : srv.network_in
+      }));
+      setChartData(chart);
+
+    } catch (err) {
+      console.error("Erreur chargement données :", err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+    // Rafraîchir toutes les 30 secondes
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculs pour les cards
+  const totalServers   = servers.length;
+  const totalAlerts    = alerts.filter(a => a.level === "critical" || a.level === "warning").length;
+  const avgCPU         = servers.length > 0
+    ? (servers.reduce((sum, s) => sum + s.cpu_usage, 0) / servers.length).toFixed(1)
+    : 0;
+  const totalRisks     = alerts.filter(a => a.level === "critical").length;
+
+  if (loading) {
+    return <div style={{ color: "white", padding: "20px" }}>Chargement...</div>;
+  }
+
   return (
     <div className="overview">
 
-      {/* Cards */}
-<div className="cards">
-  <div className="card">
-    <FaServer className="icon" />
-    <div className="card-content">
-      <span>Servers</span>
-      <span className="value">10</span>
-    </div>
-  </div>
+      {/* ✅ CARDS — données réelles */}
+      <div className="cards">
+        <div className="card">
+          <FaServer className="icon" />
+          <div className="card-content">
+            <span>Servers</span>
+            <span className="value">{totalServers}</span>
+          </div>
+        </div>
 
-  <div className="card">
-    <FaExclamationTriangle className="icon" />
-    <div className="card-content">
-      <span>Alerts</span>
-      <span className="value">3</span>
-    </div>
-  </div>
+        <div className="card">
+          <FaExclamationTriangle className="icon" />
+          <div className="card-content">
+            <span>Alerts</span>
+            <span className="value" style={{ color: totalAlerts > 0 ? "#ef4444" : "white" }}>
+              {totalAlerts}
+            </span>
+          </div>
+        </div>
 
-  <div className="card">
-    <FaMicrochip className="icon" />
-    <div className="card-content">
-      <span>CPU Avg</span>
-      <span className="value">75%</span>
-    </div>
-  </div>
+        <div className="card">
+          <FaMicrochip className="icon" />
+          <div className="card-content">
+            <span>CPU Avg</span>
+            <span className="value" style={{ color: avgCPU > 80 ? "#ef4444" : "#22c55e" }}>
+              {avgCPU}%
+            </span>
+          </div>
+        </div>
 
-  <div className="card">
-    <FaExclamationCircle className="icon" />
-    <div className="card-content">
-      <span>Risks</span>
-      <span className="value">2</span>
-    </div>
-  </div>
-</div>
+        <div className="card">
+          <FaExclamationCircle className="icon" />
+          <div className="card-content">
+            <span>Risks</span>
+            <span className="value" style={{ color: totalRisks > 0 ? "#ef4444" : "white" }}>
+              {totalRisks}
+            </span>
+          </div>
+        </div>
+      </div>
 
-      {/* Charts */}
+      {/* ✅ CHARTS — données réelles */}
       <div className="charts">
         <div className="chart-box">
           <h3>CPU Usage</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={data}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time" />
-              <YAxis />
+              <YAxis domain={[0, 100]} />
               <Tooltip />
-              <Line type="monotone" dataKey="cpu" stroke="#ef4444" />
+              <Line type="monotone" dataKey="cpu" stroke="#ef4444" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -76,31 +123,36 @@ const Overview = () => {
         <div className="chart-box">
           <h3>RAM Usage</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={data}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time" />
-              <YAxis />
+              <YAxis domain={[0, 100]} />
               <Tooltip />
-              <Line type="monotone" dataKey="ram" stroke="#22c55e" />
+              <Line type="monotone" dataKey="ram" stroke="#22c55e" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Bottom Section */}
+      {/* ✅ BOTTOM — données réelles */}
       <div className="bottom">
 
-        {/* Alerts */}
+        {/* Alertes récentes */}
         <div className="alerts">
           <h3>Recent Alerts</h3>
           <ul>
-            <li>Server-1 → CPU &gt; 90%</li>
-            <li>Server-2 → Error 500</li>
-            <li>Server-3 → Memory High</li>
+            {alerts.slice(0, 5).map((alert, i) => (
+              <li key={i} style={{
+                color : alert.level === "critical" ? "#ef4444" :
+                        alert.level === "warning"  ? "#f59e0b" : "#3b82f6"
+              }}>
+                {alert.server} → {alert.message}
+              </li>
+            ))}
           </ul>
         </div>
 
-        {/* Table */}
+        {/* Table des serveurs */}
         <div className="table">
           <h3>Servers Status</h3>
           <table>
@@ -113,22 +165,23 @@ const Overview = () => {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>EC2-1</td>
-                <td className="ok">OK</td>
-                <td>40%</td>
-                <td>60%</td>
-              </tr>
-              <tr>
-                <td>EC2-2</td>
-                <td className="alert">Alert</td>
-                <td>95%</td>
-                <td>88%</td>
-              </tr>
+              {servers.map((srv, i) => (
+                <tr key={i}>
+                  <td>{srv.server_name}</td>
+                  <td className={srv.prediction === "anomalie" ? "alert" : "ok"}>
+                    {srv.prediction === "anomalie" ? "⚠️ Alert" : "✅ OK"}
+                  </td>
+                  <td style={{ color: srv.cpu_usage > 80 ? "#ef4444" : "white" }}>
+                    {srv.cpu_usage}%
+                  </td>
+                  <td style={{ color: srv.ram_usage > 80 ? "#ef4444" : "white" }}>
+                    {srv.ram_usage}%
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-
       </div>
     </div>
   );

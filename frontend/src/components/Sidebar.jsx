@@ -13,14 +13,14 @@ const Sidebar = () => {
     <div className="sidebar">
       {/* Logo */}
       <div className="logo">
-        <span className="logo-icon">🧠</span>
-        <h2>AI Log Monitor</h2>
+        <span className="logo-icon"></span>
+        <h3>Log Monitor</h3>
       </div>
 
       {/* Profile */}
       <div className="profile">
         {/* Ajout de la classe avatar pour ton CSS */}
-        <img src="https://via.placeholder.com/40" alt="user" className="avatar" />
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRClWfr44mjsFpTJj0eHHLDuPUSWdsWx8rKZpQ8O4AuIICXH2XelNVK15U&s" alt="user" className="avatar" />
         <div>
           <h4>Admin</h4>
           <p>AWS System</p>
@@ -46,15 +46,6 @@ const Sidebar = () => {
             <li className={isActive ? "active" : ""}>
               <FaServer />
               <span>Servers</span>
-            </li>
-          )}
-        </NavLink>
-
-        <NavLink to="/predictions" style={{ textDecoration: 'none', color: 'inherit' }}>
-          {({ isActive }) => (
-            <li className={isActive ? "active" : ""}>
-              <FaBrain />
-              <span>Predictions DL</span>
             </li>
           )}
         </NavLink>
