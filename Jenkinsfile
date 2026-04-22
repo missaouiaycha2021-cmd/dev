@@ -99,7 +99,7 @@ pipeline {
                 script {
                     try {
                         snykSecurity(
-                            snykInstallation: 'Snyk',
+                            snykInstallation: 'snyk',
                             snykTokenId: 'snyk-token',
                             failOnIssues: false,
                             monitorProjectOnBuild: true,
