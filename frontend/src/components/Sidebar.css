@@ -1,0 +1,99 @@
+.sidebar {
+  width: 260px;
+  height: 100vh;
+  background: linear-gradient(180deg, #0f172a, #111827);
+  color: #cbd5e1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ef4444;
+  font-size: 20px;
+  margin-bottom: 30px;
+}
+
+.logo-icon {
+  font-size: 22px;
+}
+
+/* Profile */
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.profile h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #fff;
+}
+
+.profile p {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.status {
+  width: 10px;
+  height: 10px;
+  background: #22c55e;
+  border-radius: 50%;
+  position: absolute;
+  left: 28px;
+  bottom: 5px;
+  border: 2px solid #111827;
+}
+
+/* Menu */
+.menu {
+  list-style: none;
+  padding: 0;
+}
+
+.menu li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.menu li:hover {
+  background: #1f2937;
+}
+
+/* Active item */
+.menu li.active {
+  background: black;
+  color: #ef4444;
+}
+
+/* Icons */
+.menu li svg {
+  font-size: 16px;
+}
+
+/* Arrow */
+.arrow {
+  margin-left: auto;
+  font-size: 12px;
+}

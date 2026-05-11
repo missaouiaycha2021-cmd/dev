@@ -1,0 +1,56 @@
+---
+- name: Déployer le frontend React sur EC2
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Installer Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Démarrer Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Installer pip3
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Installer SDK Docker pour Python
+      pip:
+        name: docker
+        state: present
+
+    - name: Arrêter l'ancien container s'il existe
+      docker_container:
+        name: mon-dashboard-frontend
+        state: absent
+      ignore_errors: yes
+
+    - name: Puller l'image depuis Docker Hub
+      docker_image:
+        name: aycha123/mon-dashboard-frontend:latest
+        source: pull
+        force_source: yes
+
+    - name: Lancer le container React
+      docker_container:
+        name: mon-dashboard-frontend
+        image: aycha123/mon-dashboard-frontend:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "80:80"
+
+    - name: Vérifier que le container tourne
+      shell: docker ps | grep mon-dashboard-frontend
+      register: result
+
+    - name: Afficher le statut
+      debug:
+        msg: "✅ Frontend déployé : {{ result.stdout }}"

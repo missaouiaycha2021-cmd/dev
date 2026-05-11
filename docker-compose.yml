@@ -1,0 +1,14 @@
+services:
+  backend:
+    image: aycha123/mon-dashboard-backend:latest
+    ports:
+      - "5000:5000"
+    restart: always
+
+  frontend:
+    image: aycha123/mon-dashboard-frontend:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
