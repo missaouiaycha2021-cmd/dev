@@ -1,8 +1,10 @@
 ---
+# =========================================================
+# DEPLOY FRONTEND
+# =========================================================
 - name: Déployer le frontend React sur EC2
-  hosts: servers
+  hosts: frontend
   become: yes
-
   tasks:
     - name: Installer Docker
       apt:
@@ -54,3 +56,65 @@
     - name: Afficher le statut
       debug:
         msg: "✅ Frontend déployé : {{ result.stdout }}"
+
+# =========================================================
+# DEPLOY BACKEND
+# =========================================================
+- name: Déployer le backend Flask sur EC2
+  hosts: backend
+  become: yes
+  vars:
+    ansible_ssh_common_args: '-o ProxyJump=ubuntu@44.230.178.61'
+  tasks:
+    - name: Installer Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Démarrer Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Installer pip3
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Installer SDK Docker pour Python
+      pip:
+        name: docker
+        state: present
+
+    - name: Arrêter l'ancien container s'il existe
+      docker_container:
+        name: mon-dashboard-backend
+        state: absent
+      ignore_errors: yes
+
+    - name: Puller l'image depuis Docker Hub
+      docker_image:
+        name: aycha123/mon-dashboard-backend:latest
+        source: pull
+        force_source: yes
+
+    - name: Lancer le container Flask
+      docker_container:
+        name: mon-dashboard-backend
+        image: aycha123/mon-dashboard-backend:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "5000:5000"
+        env:
+          MONGO_URI: "mongodb://10.0.5.68:27017/"
+
+    - name: Vérifier que le container tourne
+      shell: docker ps | grep mon-dashboard-backend
+      register: result
+
+    - name: Afficher le statut
+      debug:
+        msg: "✅ Backend déployé : {{ result.stdout }}"
