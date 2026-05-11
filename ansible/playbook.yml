@@ -64,7 +64,7 @@
   hosts: backend
   become: yes
   vars:
-    ansible_ssh_common_args: '-o ProxyJump=ubuntu@44.230.178.61'
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ProxyCommand="ssh -i /home/pfa/.jenkins/.ssh/key-devops.pem -W %h:%p ubuntu@35.83.29.151"'
   tasks:
     - name: Installer Docker
       apt:
