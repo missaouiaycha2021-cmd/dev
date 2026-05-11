@@ -14,7 +14,7 @@ CORS(app)
 # =========================================================
 # MONGODB
 # =========================================================
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient("mongodb://10.0.3.99:27017/")
 db = client["anomaly_db"]
 servers_collection = db["servers"]
 alerts_collection  = db["alerts"]
