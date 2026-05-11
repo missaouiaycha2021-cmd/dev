@@ -1,9 +1,15 @@
+# ansible/playbook.yml
+
 ---
+# =========================================================
+# DEPLOY FRONTEND
+# =========================================================
 - name: Déployer le frontend React sur EC2
-  hosts: servers
+  hosts: frontend
   become: yes
 
   tasks:
+
     - name: Installer Docker
       apt:
         name: docker.io
@@ -16,6 +22,12 @@
         state: started
         enabled: yes
 
+    - name: Ajouter ubuntu au groupe docker
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
     - name: Installer pip3
       apt:
         name: python3-pip
@@ -25,20 +37,21 @@
       pip:
         name: docker
         state: present
+        executable: pip3
 
-    - name: Arrêter l'ancien container s'il existe
+    - name: Arrêter l'ancien container frontend
       docker_container:
         name: mon-dashboard-frontend
         state: absent
       ignore_errors: yes
 
-    - name: Puller l'image depuis Docker Hub
+    - name: Pull image frontend depuis Docker Hub
       docker_image:
         name: aycha123/mon-dashboard-frontend:latest
         source: pull
         force_source: yes
 
-    - name: Lancer le container React
+    - name: Lancer container frontend
       docker_container:
         name: mon-dashboard-frontend
         image: aycha123/mon-dashboard-frontend:latest
@@ -47,10 +60,80 @@
         ports:
           - "80:80"
 
-    - name: Vérifier que le container tourne
+    - name: Vérifier frontend
       shell: docker ps | grep mon-dashboard-frontend
-      register: result
+      register: frontend_result
 
-    - name: Afficher le statut
+    - name: Afficher statut frontend
       debug:
-        msg: "✅ Frontend déployé : {{ result.stdout }}"
+        msg: "✅ Frontend déployé : {{ frontend_result.stdout }}"
+
+
+# =========================================================
+# DEPLOY BACKEND
+# =========================================================
+- name: Déployer le backend Flask sur EC2
+  hosts: backend
+  become: yes
+
+  tasks:
+
+    - name: Installer Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Démarrer Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Ajouter ubuntu au groupe docker
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Installer pip3
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Installer SDK Docker pour Python
+      pip:
+        name: docker
+        state: present
+        executable: pip3
+
+    - name: Arrêter ancien container backend
+      docker_container:
+        name: mon-dashboard-backend
+        state: absent
+      ignore_errors: yes
+
+    - name: Pull image backend depuis Docker Hub
+      docker_image:
+        name: aycha123/mon-dashboard-backend:latest
+        source: pull
+        force_source: yes
+
+    - name: Lancer container backend
+      docker_container:
+        name: mon-dashboard-backend
+        image: aycha123/mon-dashboard-backend:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "5000:5000"
+        env:
+          MONGO_URI: "mongodb://10.0.3.99:27017/dashboard"
+
+    - name: Vérifier backend
+      shell: docker ps | grep mon-dashboard-backend
+      register: backend_result
+
+    - name: Afficher statut backend
+      debug:
+        msg: "✅ Backend déployé : {{ backend_result.stdout }}"
