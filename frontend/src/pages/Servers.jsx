@@ -10,7 +10,7 @@ const Servers = () => {
   const fetchServers = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/servers");
+      const res = await fetch("http://10.0.3.41:5000/api/servers");
       const data = await res.json();
       setServers(data);
     } catch (err) {

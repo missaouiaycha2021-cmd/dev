@@ -10,7 +10,7 @@ const Alerts = () => {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const res  = await fetch("http://localhost:5000/api/alerts");
+      const res  = await fetch("http://10.0.3.13:5000/api/alerts");
       const data = await res.json();
       setAlertLogs(data);
     } catch (err) {

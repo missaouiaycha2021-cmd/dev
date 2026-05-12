@@ -16,8 +16,8 @@ const Overview = () => {
     try {
       // Charger serveurs et alertes en même temps
       const [resServers, resAlerts] = await Promise.all([
-        fetch("http://localhost:5000/api/servers"),
-        fetch("http://localhost:5000/api/alerts")
+        fetch("http://10.0.3.41:5000/api/servers"),
+        fetch("http://10.0.3.41:5000/api/alerts")
       ]);
 
       const dataServers = await resServers.json();
