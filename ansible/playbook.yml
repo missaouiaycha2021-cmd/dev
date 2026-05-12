@@ -101,15 +101,15 @@
         force_source: yes
 
     - name: Récupérer AccessKeyId
-      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabInstanceProfile | python3 -c "import sys,json; print(json.load(sys.stdin)['AccessKeyId'])"
+      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabRole | python3 -c "import sys,json; print(json.load(sys.stdin)['AccessKeyId'])"
       register: aws_key_id
 
     - name: Récupérer SecretAccessKey
-      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabInstanceProfile | python3 -c "import sys,json; print(json.load(sys.stdin)['SecretAccessKey'])"
+      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabRole | python3 -c "import sys,json; print(json.load(sys.stdin)['SecretAccessKey'])"
       register: aws_secret
 
     - name: Récupérer SessionToken
-      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabInstanceProfile | python3 -c "import sys,json; print(json.load(sys.stdin)['Token'])"
+      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabRole | python3 -c "import sys,json; print(json.load(sys.stdin)['Token'])"
       register: aws_token
 
     - name: Lancer le container Flask
