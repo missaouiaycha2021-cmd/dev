@@ -100,6 +100,18 @@
         source: pull
         force_source: yes
 
+    - name: Récupérer AccessKeyId
+      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabInstanceProfile | python3 -c "import sys,json; print(json.load(sys.stdin)['AccessKeyId'])"
+      register: aws_key_id
+
+    - name: Récupérer SecretAccessKey
+      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabInstanceProfile | python3 -c "import sys,json; print(json.load(sys.stdin)['SecretAccessKey'])"
+      register: aws_secret
+
+    - name: Récupérer SessionToken
+      shell: curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/LabInstanceProfile | python3 -c "import sys,json; print(json.load(sys.stdin)['Token'])"
+      register: aws_token
+
     - name: Lancer le container Flask
       docker_container:
         name: mon-dashboard-backend
@@ -109,7 +121,11 @@
         ports:
           - "5000:5000"
         env:
-          MONGO_URI: "mongodb://10.0.3.41:27017/"
+          MONGO_URI: "mongodb://10.0.5.110:27017/"
+          AWS_DEFAULT_REGION: "us-west-2"
+          AWS_ACCESS_KEY_ID: "{{ aws_key_id.stdout }}"
+          AWS_SECRET_ACCESS_KEY: "{{ aws_secret.stdout }}"
+          AWS_SESSION_TOKEN: "{{ aws_token.stdout }}"
 
     - name: Vérifier que le container tourne
       shell: docker ps | grep mon-dashboard-backend
