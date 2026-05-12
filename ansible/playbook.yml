@@ -64,7 +64,7 @@
   hosts: backend
   become: yes
   vars:
-    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ProxyCommand="ssh -i /home/pfa/.jenkins/.ssh/key-devops.pem -W %h:%p ubuntu@35.83.29.151"'
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ProxyCommand="ssh -i /home/pfa/.jenkins/.ssh/key-devops.pem -W %h:%p ubuntu@54.214.202.8"'
   tasks:
     - name: Installer Docker
       apt:
@@ -109,7 +109,7 @@
         ports:
           - "5000:5000"
         env:
-          MONGO_URI: "mongodb://10.0.5.68:27017/"
+          MONGO_URI: "mongodb://10.0.3.41:27017/"
 
     - name: Vérifier que le container tourne
       shell: docker ps | grep mon-dashboard-backend
