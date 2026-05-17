@@ -23,10 +23,10 @@ alerts_collection  = db["alerts"]
 # INSTANCES
 # =========================================================
 INSTANCES = [
-    {"id": "i-0853d3a0e36b7f289", "name": "dashboard-az1"},
-    {"id": "i-0e054bc85f2b43ebf", "name": "backend-az1"},
-    {"id": "i-013bdedfe032fb9c7", "name": "database"},
-    {"id": "i-0d7be62e2a70146ac", "name": "monitoring"},
+    {"id": "i-06011e7c925e724fb", "name": "dashboard-az1"},
+    {"id": "i-0c938cd9a83cb02ea", "name": "backend-az1"},
+    {"id": "i-0eab145bbdd3511e6", "name": "database"},
+    {"id": "i-0691781fb5339596f", "name": "monitoring"},
 ]
 
 # =========================================================
