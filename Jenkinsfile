@@ -53,6 +53,17 @@ pipeline {
             }
         }
 
+        stage('Clean Docker Space') {
+            steps {
+                sh '''
+                    echo "=== Cleaning Docker space ==="
+                    docker system prune -f || true
+                    docker image prune -f  || true
+                    df -h
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             parallel {
                 stage('Backend') {
@@ -175,6 +186,7 @@ pipeline {
                         --output trivy-backend-image.html \
                         --ignore-unfixed \
                         --skip-version-check \
+                        --timeout 10m \
                         $BACKEND_IMAGE:$IMAGE_TAG || true
                 '''
                 archiveArtifacts artifacts: 'trivy-backend-image.html', allowEmptyArchive: true
@@ -191,6 +203,7 @@ pipeline {
                         --output trivy-frontend-image.html \
                         --ignore-unfixed \
                         --skip-version-check \
+                        --timeout 10m \
                         $FRONTEND_IMAGE:$IMAGE_TAG || true
                 '''
                 archiveArtifacts artifacts: 'trivy-frontend-image.html', allowEmptyArchive: true
@@ -213,18 +226,22 @@ pipeline {
             parallel {
                 stage('Backend') {
                     steps {
-                        sh '''
-                            docker push $BACKEND_IMAGE:$IMAGE_TAG
-                            docker push $BACKEND_IMAGE:latest
-                        '''
+                        retry(3) {
+                            sh '''
+                                docker push $BACKEND_IMAGE:$IMAGE_TAG
+                                docker push $BACKEND_IMAGE:latest
+                            '''
+                        }
                     }
                 }
                 stage('Frontend') {
                     steps {
-                        sh '''
-                            docker push $FRONTEND_IMAGE:$IMAGE_TAG
-                            docker push $FRONTEND_IMAGE:latest
-                        '''
+                        retry(3) {
+                            sh '''
+                                docker push $FRONTEND_IMAGE:$IMAGE_TAG
+                                docker push $FRONTEND_IMAGE:latest
+                            '''
+                        }
                     }
                 }
             }
