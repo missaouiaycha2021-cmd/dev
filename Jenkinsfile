@@ -15,6 +15,7 @@ pipeline {
         IMAGE_TAG          = "v${BUILD_NUMBER}"
         SONAR_PROJECT_KEY  = "mon-project"
         SONAR_PROJECT_NAME = "mon-project"
+        NODE_PATH          = "/home/pfa/.nvm/versions/node/v20.20.2/bin"
     }
 
     stages {
@@ -42,6 +43,7 @@ pipeline {
                 sh '''
                     echo "=== Checking tools ==="
                     python3 --version || true
+                    export PATH="/home/pfa/.nvm/versions/node/v20.20.2/bin:$PATH"
                     node --version    || true
                     docker --version  || true
                     docker compose version || true
@@ -67,9 +69,9 @@ pipeline {
                     steps {
                         dir('frontend') {
                             sh '''
-                                export NVM_DIR="$HOME/.nvm"
-                                . "$NVM_DIR/nvm.sh"
-                                nvm use 20
+                                export PATH="/home/pfa/.nvm/versions/node/v20.20.2/bin:$PATH"
+                                node --version
+                                npm --version
                                 npm ci
                             '''
                         }
@@ -82,9 +84,7 @@ pipeline {
             steps {
                 dir('frontend') {
                     sh '''
-                        export NVM_DIR="$HOME/.nvm"
-                        . "$NVM_DIR/nvm.sh"
-                        nvm use 20
+                        export PATH="/home/pfa/.nvm/versions/node/v20.20.2/bin:$PATH"
                         npm run build
                     '''
                 }
