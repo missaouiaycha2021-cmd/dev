@@ -1,8 +1,14 @@
 pipeline {
     agent any
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
     triggers {
         githubPush()
     }
+
     environment {
         BACKEND_IMAGE      = "aycha123/mon-dashboard-backend"
         FRONTEND_IMAGE     = "aycha123/mon-dashboard-frontend"
@@ -15,7 +21,19 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [
+                        [$class: 'CloneOption',
+                         shallow: true,
+                         depth: 1,
+                         timeout: 30]
+                    ],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/missaouiaycha2021-cmd/dev'
+                    ]]
+                ])
             }
         }
 
@@ -212,24 +230,23 @@ pipeline {
             }
         }
 
-        // ====================== ANSIBLE ← NOUVEAU ======================
-     stage('Ansible - Configure Server') {
-    steps {
-        script {
-            try {
-                sh '''
-                    cd ansible/
-                    ansible all -m ping
-                    ansible-playbook playbook.yml \
-                        -i inventory.ini
-                '''
-                echo "✅ Ansible completed"
-            } catch (e) {
-                echo "⚠️ Ansible failed: ${e}"
+        stage('Ansible - Configure Server') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            cd ansible/
+                            ansible all -m ping
+                            ansible-playbook playbook.yml \
+                                -i inventory.ini
+                        '''
+                        echo "✅ Ansible completed"
+                    } catch (e) {
+                        echo "⚠️ Ansible failed: ${e}"
+                    }
+                }
             }
         }
-    }
-}
 
         stage('Deploy') {
             steps {
@@ -265,8 +282,12 @@ pipeline {
                 } catch (e) {
                     echo "⚠️ publishHTML non disponible"
                 }
+                try {
+                    sh 'docker logout || true'
+                } catch (e) {
+                    echo "⚠️ docker logout ignoré"
+                }
             }
-            sh 'docker logout || true'
             cleanWs()
         }
     }
