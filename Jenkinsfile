@@ -103,24 +103,30 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                script {
-                    try {
-                        def scannerHome = tool 'SonarQube Scanner'
-                        withSonarQubeEnv('sonarqube') {
-                            sh "${scannerHome}/bin/sonar-scanner \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                                -Dsonar.projectName=\"${SONAR_PROJECT_NAME}\" \
-                                -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**"
-                        }
-                        echo "✅ SonarQube Analysis completed"
-                    } catch (e) {
-                        echo "⚠️ SonarQube failed: ${e}"
+    steps {
+        script {
+            try {
+                def scannerHome = tool 'SonarQube Scanner'
+                withSonarQubeEnv('sonarqube') {
+                    withCredentials([string(
+                        credentialsId: 'sonar-token',
+                        variable: 'SONAR_TOKEN'
+                    )]) {
+                        sh "${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.projectName=\"${SONAR_PROJECT_NAME}\" \
+                            -Dsonar.sources=. \
+                            -Dsonar.login=${SONAR_TOKEN} \
+                            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/venv/**,**/.git/**"
                     }
                 }
+                echo "✅ SonarQube Analysis completed"
+            } catch (e) {
+                echo "⚠️ SonarQube failed: ${e}"
             }
         }
+    }
+}
 
         stage('Snyk Security Scan') {
             steps {
