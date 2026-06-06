@@ -14,19 +14,19 @@ CORS(app)
 # =========================================================
 # MONGODB
 # =========================================================
-client = MongoClient("mongodb://10.0.5.88:27017/")
+client = MongoClient("mongodb://10.0.3.102:27017/")
 db = client["anomaly_db"]
 servers_collection = db["servers"]
 alerts_collection  = db["alerts"]
 
-# =========================================================
+# ===========================F==============================
 # INSTANCES
 # =========================================================
 INSTANCES = [
-    {"id": "i-06011e7c925e724fb", "name": "dashboard-az1"},
-    {"id": "i-0c938cd9a83cb02ea", "name": "backend-az1"},
-    {"id": "i-0eab145bbdd3511e6", "name": "database"},
-    {"id": "i-0691781fb5339596f", "name": "monitoring"},
+    {"id": "i-0bb41fe429832e727", "name": "dashboard-az1"},
+    {"id": "i-09865fd292d166801", "name": "backend-az1"},
+    {"id": "i-0d4cda459193ac912", "name": "database"},
+    {"id": "i-0f447ce519eb8a4b4", "name": "monitoring"},
 ]
 
 # =========================================================

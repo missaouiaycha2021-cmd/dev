@@ -5,6 +5,7 @@
   hosts: frontend
   become: yes
   tasks:
+    # 1. On s'assure que Docker et ses outils sont installés
     - name: Installer Docker
       apt:
         name: docker.io
@@ -27,26 +28,62 @@
         name: docker
         state: present
 
-    - name: Arrêter l'ancien container s'il existe
+    # 2. 🛑 CORRECTION : ON ARRÊTE LE CONTENEUR DOCKER ICI POUR LIBÉRER LE PORT 80
+    - name: Arrêter l'ancien container pour libérer le port 80
       docker_container:
         name: mon-dashboard-frontend
         state: absent
       ignore_errors: yes
 
+    # 3. Maintenant que le port 80 est libre, on installe et démarre Nginx
+    - name: Installer Nginx sur le Dashboard
+      apt:
+        name: nginx
+        state: present
+
+    - name: Créer la configuration de redirection Nginx
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80;
+              server_name localhost;
+
+              location /api/ {
+                  proxy_pass http://10.0.3.102:5000/api/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+
+    - name: Démarrer Nginx pour appliquer les changements
+      service:
+        name: nginx
+        state: restarted
+
+    # 4. Enfin, on relance Docker sur le port 8080 (Nginx s'occupera de lui envoyer le trafic)
     - name: Puller l'image depuis Docker Hub
       docker_image:
         name: aycha123/mon-dashboard-frontend:latest
         source: pull
         force_source: yes
 
-    - name: Lancer le container React
+    - name: Lancer le container React sur le port 8080
       docker_container:
         name: mon-dashboard-frontend
         image: aycha123/mon-dashboard-frontend:latest
         state: started
         restart_policy: always
         ports:
-          - "80:80"
+          - "8080:80"
 
     - name: Vérifier que le container tourne
       shell: docker ps | grep mon-dashboard-frontend
@@ -54,65 +91,4 @@
 
     - name: Afficher le statut
       debug:
-        msg: "✅ Frontend déployé : {{ result.stdout }}"
-
-# =========================================================
-# DEPLOY BACKEND
-# =========================================================
-- name: Déployer le backend Flask sur EC2
-  hosts: backend
-  become: yes
-  # Le bloc vars: ansible_ssh_common_args a été SUPPRIMÉ d'ici
-  tasks:
-    - name: Installer Docker
-      apt:
-        name: docker.io
-        state: present
-        update_cache: yes
-
-    - name: Démarrer Docker
-      service:
-        name: docker
-        state: started
-        enabled: yes
-
-    - name: Installer pip3
-      apt:
-        name: python3-pip
-        state: present
-
-    - name: Installer SDK Docker pour Python
-      pip:
-        name: docker
-        state: present
-
-    - name: Arrêter l'ancien container s'il existe
-      docker_container:
-        name: mon-dashboard-backend
-        state: absent
-      ignore_errors: yes
-
-    - name: Puller l'image depuis Docker Hub
-      docker_image:
-        name: aycha123/mon-dashboard-backend:latest
-        source: pull
-        force_source: yes
-
-    - name: Lancer le container Flask
-      docker_container:
-        name: mon-dashboard-backend
-        image: aycha123/mon-dashboard-backend:latest
-        state: started
-        restart_policy: always
-        ports:
-          - "5000:5000"
-        env:
-          MONGO_URI: "mongodb://10.0.5.92:27017/"
-
-    - name: Vérifier que le container tourne
-      shell: docker ps | grep mon-dashboard-backend
-      register: result
-
-    - name: Afficher le statut
-      debug:
-        msg: "✅ Backend déployé : {{ result.stdout }}"
+        msg: "✅ Frontend déployé sur le port 8080 : {{ result.stdout }}"

@@ -16,8 +16,8 @@ const Overview = () => {
     try {
       // Charger serveurs et alertes en même temps
       const [resServers, resAlerts] = await Promise.all([
-        fetch("http://app-lb-1482715375.us-west-2.elb.amazonaws.com/api/servers"),
-        fetch("http://app-lb-1482715375.us-west-2.elb.amazonaws.com/api/alerts")
+        fetch("/api/servers"),
+        fetch("/api/alerts")
       ]);
 
       const dataServers = await resServers.json();
